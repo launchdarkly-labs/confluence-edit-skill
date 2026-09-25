@@ -65,9 +65,6 @@ export CONFLUENCE_USERNAME="you@company.com"
 export CONFLUENCE_API_TOKEN="…"
 ```
 
-If you already use the Atlassian MCP (`mcp-atlassian`), the CLI reuses its token
-from `~/.claude.json` automatically — no env vars needed.
-
 **This is not a full Confluence integration.** The `confluence-edit` skill only
 *reads and edits existing pages*. For searching, creating pages, comments, or
 labels, keep using the Atlassian MCP.

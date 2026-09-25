@@ -1,26 +1,12 @@
 """Minimal Confluence Cloud API layer (v2 storage GET/PUT).
 
-Configuration, in priority order:
-  1. env vars CONFLUENCE_URL + CONFLUENCE_USERNAME + CONFLUENCE_API_TOKEN
-  2. the mcp-atlassian server config in ~/.claude.json
+Configure with the CONFLUENCE_URL, CONFLUENCE_USERNAME, and
+CONFLUENCE_API_TOKEN environment variables.
 
 Credentials are read at runtime; they are never written into this repo.
 """
 import base64, json, os, re, urllib.request, urllib.error
 from functools import lru_cache
-
-CLAUDE_CONFIG = os.path.expanduser(
-    os.environ.get("CLAUDE_CONFIG_PATH", "~/.claude.json"))
-
-
-def _creds_from_mcp():
-    try:
-        d = json.load(open(CLAUDE_CONFIG))
-        env = d.get("mcpServers", {}).get("mcp-atlassian", {}).get("env", {})
-        return (env.get("CONFLUENCE_USERNAME"), env.get("CONFLUENCE_API_TOKEN"),
-                env.get("CONFLUENCE_URL"))
-    except Exception:
-        return (None, None, None)
 
 
 def _resolve_auth():
@@ -28,9 +14,6 @@ def _resolve_auth():
     user = os.environ.get("CONFLUENCE_USERNAME")
     token = os.environ.get("CONFLUENCE_API_TOKEN")
     url = os.environ.get("CONFLUENCE_URL")
-    if not (user and token):
-        muser, mtoken, murl = _creds_from_mcp()
-        user, token, url = user or muser, token or mtoken, url or murl
 
     missing = [
         name for name, value in (
@@ -42,7 +25,7 @@ def _resolve_auth():
     if missing:
         raise RuntimeError(
             "missing Confluence configuration: " + ", ".join(missing) +
-            " (set environment variables or configure mcp-atlassian)")
+            " (set the required environment variables)")
 
     domain = re.sub(r"^https?://", "", url).split("/")[0]
     basic = base64.b64encode(f"{user}:{token}".encode()).decode()
