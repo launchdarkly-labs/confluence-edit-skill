@@ -1,0 +1,6 @@
+# transient working copies + sidecars from pull/push
+.confluence/
+
+# python
+__pycache__/
+*.pyc

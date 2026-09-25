@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""confluence-edit-skill — comment-safe Confluence editing for agents.
+
+  read <id|url>                 print the page as markdown (lossy, comprehension only)
+  pull <id|url>                 fetch storage -> .confluence/<id>.xml (pretty-printed) + sidecar
+  push <id|url> [--dry-run]     minify edited storage -> version-locked PUT, with guards
+       [--delete-comments r1,r2]   acknowledge orphaning inline comments
+       [--allow-rewrite]           acknowledge a non-targeted edit (most elements regenerated)
+
+Workflow: `read` to understand the page; `pull` to get an editable storage file;
+edit the .xml with the Edit tool (targeted edits only); `push`.
+"""
+import argparse, json, os, sys, datetime
+sys.path.insert(0, os.path.dirname(__file__))
+import confluence_api as api
+import storage_fmt as sf
+import view_md
+
+DIR = ".confluence"
+REWRITE_FLOOR = 0.5   # require >=50% of original element ids to survive a push
+
+
+def _paths(pid):
+    return os.path.join(DIR, f"{pid}.xml"), os.path.join(DIR, f"{pid}.sidecar.json")
+
+
+def cmd_read(args):
+    pid = api.extract_page_id(args.page)
+    v = api.get_view_html(pid)
+    print(view_md.to_markdown(v["html"]))
+
+
+def cmd_pull(args):
+    pid = api.extract_page_id(args.page)
+    page = api.get_page(pid)
+    pretty = sf.pretty(page["storage"])
+    os.makedirs(DIR, exist_ok=True)
+    xmlp, scp = _paths(pid)
+    open(xmlp, "w").write(pretty)
+    json.dump({
+        "page_id": pid, "title": page["title"], "status": page["status"],
+        "version": page["version"],
+        "orig_storage": sf.minify(page["storage"]),
+        "fetched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }, open(scp, "w"), indent=1)
+    nids = len(sf.local_ids(page["storage"]))
+    nrefs = len(sf.comment_refs(page["storage"]))
+    print(f"pulled '{page['title']}' v{page['version']} -> {xmlp}")
+    print(f"  {len(pretty.splitlines())} lines, {nids} element ids, {nrefs} inline comment(s)")
+    print("  edit the .xml with targeted edits (keep element tags & local-id/ac:ref intact), then push")
+
+
+def cmd_push(args):
+    pid = api.extract_page_id(args.page)
+    xmlp, scp = _paths(pid)
+    if not os.path.exists(scp):
+        sys.exit(f"no local pull for {pid} (run: pull first)")
+    sc = json.load(open(scp))
+    edited = sf.minify(open(xmlp).read())
+    orig = sc["orig_storage"]
+
+    problems = []
+
+    # 1. well-formedness
+    ok, why = sf.well_formed(edited)
+    if not ok:
+        problems.append("storage is not well-formed: " + "; ".join(why))
+
+    # 2. comment preservation
+    lost_refs = sf.comment_refs(orig) - sf.comment_refs(edited)
+    acked = {x.strip() for x in (args.delete_comments or "").split(",") if x.strip()}
+    unacked = lost_refs - acked
+    if unacked:
+        problems.append("inline comments would be orphaned: " + ", ".join(sorted(unacked)))
+        problems.append("  -> keep their <ac:inline-comment-marker> tags, or --delete-comments " +
+                        ",".join(sorted(unacked)))
+
+    # 3. anti-clobber: did this stay a *targeted* edit?
+    oids, eids = sf.local_ids(orig), sf.local_ids(edited)
+    preserved = len(oids & eids)
+    if oids and preserved < REWRITE_FLOOR * len(oids) and not args.allow_rewrite:
+        problems.append(
+            f"looks like a regeneration, not a targeted edit: only {preserved}/{len(oids)} "
+            f"original element ids survived. Confluence can't track-edit this and comments/macros "
+            f"may detach. Make narrower edits, or --allow-rewrite to override.")
+
+    if problems:
+        print("PUSH REJECTED:\n" + "\n".join("  " + p for p in problems))
+        sys.exit(2)
+
+    print(f"guards OK | element ids preserved {preserved}/{len(oids)} | "
+          f"comments {len(sf.comment_refs(edited))} | {'changed' if edited != orig else 'no change'}")
+    if args.dry_run:
+        print("dry-run — would push.")
+        return
+
+    live = api.current_version(pid)
+    if live != sc["version"]:
+        sys.exit(f"PUSH REJECTED: page changed upstream (pulled v{sc['version']}, now v{live}). Re-pull.")
+    new_v = api.put_page(pid, edited, sc["version"], sc["title"], sc["status"],
+                         "Edited via confluence-edit-skill")
+    print(f"pushed: v{sc['version']} -> v{new_v}")
+    sc["version"] = new_v
+    sc["orig_storage"] = edited
+    json.dump(sc, open(scp, "w"), indent=1)
+
+
+def main():
+    p = argparse.ArgumentParser(prog="confluence-edit-skill")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    r = sub.add_parser("read"); r.add_argument("page"); r.set_defaults(fn=cmd_read)
+    pl = sub.add_parser("pull"); pl.add_argument("page"); pl.set_defaults(fn=cmd_pull)
+    ps = sub.add_parser("push"); ps.add_argument("page")
+    ps.add_argument("--dry-run", action="store_true")
+    ps.add_argument("--delete-comments", default="")
+    ps.add_argument("--allow-rewrite", action="store_true")
+    ps.set_defaults(fn=cmd_push)
+    args = p.parse_args()
+    args.fn(args)
+
+
+if __name__ == "__main__":
+    main()
