@@ -61,14 +61,16 @@ npx skills add launchdarkly-labs/confluence-edit-skill \
   --agent cursor --agent claude-code
 ```
 
-Alternatively, clone the repository and copy the self-contained skill folder
-to either agent's global skill directory:
+Alternatively, clone the repository and copy the self-contained root skill to
+either agent's global skill directory:
 
 ```bash
 git clone --depth 1 https://github.com/launchdarkly-labs/confluence-edit-skill.git
-mkdir -p ~/.cursor/skills ~/.claude/skills
-cp -R confluence-edit-skill/.claude/skills/confluence-edit ~/.cursor/skills/
-cp -R confluence-edit-skill/.claude/skills/confluence-edit ~/.claude/skills/
+for target in ~/.cursor/skills/confluence-edit ~/.claude/skills/confluence-edit; do
+  mkdir -p "$target"
+  cp confluence-edit-skill/SKILL.md "$target/"
+  cp -R confluence-edit-skill/scripts "$target/"
+done
 ```
 
 You can also ask Cursor or Claude to install `confluence-edit` globally from
