@@ -76,13 +76,19 @@ done
 You can also ask Cursor or Claude to install `confluence-edit` globally from
 this repository URL.
 
-Authenticate with an Atlassian API token (id.atlassian.com → Security → API tokens):
+Installation does not configure authentication. Expose these variables to the
+Cursor or Claude Code process using your normal shell or secret-management
+setup:
 
 ```bash
 export CONFLUENCE_URL="https://your-company.atlassian.net"
 export CONFLUENCE_USERNAME="you@company.com"
 export CONFLUENCE_API_TOKEN="…"
 ```
+
+Create the API token under id.atlassian.com → Security → API tokens. If the
+agent was already running when you configured the variables, restart the app or
+session. Never commit the token to the repository.
 
 The account needs permission to view the page and its space. Pushing also
 requires permission to update pages in the space.

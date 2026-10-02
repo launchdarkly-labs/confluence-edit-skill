@@ -10,8 +10,24 @@ Confluence storage format** directly. Editing the real format (not a markdown
 translation) is what keeps inline comments, macros, tables, and layouts intact.
 
 The CLI is bundled in this skill's `scripts` directory. Resolve `SKILL_DIR` to
-the directory containing this `SKILL.md`, and configure Confluence credentials
-as described in the repository README. Python 3, no dependencies.
+the directory containing this `SKILL.md`. Python 3, no dependencies.
+
+## Authentication
+
+Installation does not read or store credentials. The CLI requires these
+environment variables at runtime:
+
+- `CONFLUENCE_URL` — for example, `https://your-company.atlassian.net`
+- `CONFLUENCE_USERNAME` — the user's Atlassian account email
+- `CONFLUENCE_API_TOKEN` — an Atlassian API token
+
+They must be available to the process running Cursor or Claude Code. If they
+were configured after the agent started, tell the user to restart the app or
+session.
+
+If any variable is missing, stop and ask the user to configure it outside the
+chat. Never ask the user to paste an API token into chat, print the token, or
+write credentials into the repository.
 
 ## Workflow
 
