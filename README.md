@@ -2,6 +2,8 @@
 
 Edit Confluence pages with an AI agent, without losing comments or rich content.
 
+This skill is battle-tested and used internally. Bugfixes welcome, but there's no specific roadmap for evolving this tool.
+
 ## The problem
 
 Most of the time when an agent edits a Confluence page, the page
