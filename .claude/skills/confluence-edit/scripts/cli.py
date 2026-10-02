@@ -2,21 +2,21 @@
 """confluence-edit-skill — comment-safe Confluence editing for agents.
 
   read <id|url>                 print the page as markdown (lossy, comprehension only)
-  pull <id|url>                 fetch storage -> .confluence/<id>.xml (pretty-printed) + sidecar
+  pull <id|url>                 fetch storage -> ~/.confluence-edit/<id>.xml + sidecar
   push <id|url> [--dry-run]     minify edited storage -> version-locked PUT, with guards
-       [--delete-comments r1,r2]   acknowledge orphaning inline comments
+       [--allow-removed-comment-refs r1,r2]   acknowledge removed comment references
        [--allow-rewrite]           acknowledge a non-targeted edit (most elements regenerated)
 
 Workflow: `read` to understand the page; `pull` to get an editable storage file;
 edit the .xml with the Edit tool (targeted edits only); `push`.
 """
 import argparse, json, os, sys, datetime
-sys.path.insert(0, os.path.dirname(__file__))
 import confluence_api as api
 import storage_fmt as sf
 import view_md
 
-DIR = ".confluence"
+DIR = os.path.expanduser(
+    os.environ.get("CONFLUENCE_EDIT_DIR", "~/.confluence-edit"))
 REWRITE_FLOOR = 0.5   # require >=50% of original element ids to survive a push
 
 
@@ -68,12 +68,17 @@ def cmd_push(args):
 
     # 2. comment preservation
     lost_refs = sf.comment_refs(orig) - sf.comment_refs(edited)
-    acked = {x.strip() for x in (args.delete_comments or "").split(",") if x.strip()}
+    acked = {
+        x.strip()
+        for x in (args.allow_removed_comment_refs or "").split(",")
+        if x.strip()
+    }
     unacked = lost_refs - acked
     if unacked:
         problems.append("inline comments would be orphaned: " + ", ".join(sorted(unacked)))
-        problems.append("  -> keep their <ac:inline-comment-marker> tags, or --delete-comments " +
-                        ",".join(sorted(unacked)))
+        problems.append(
+            "  -> keep their <ac:inline-comment-marker> tags, or "
+            "--allow-removed-comment-refs " + ",".join(sorted(unacked)))
 
     # 3. anti-clobber: did this stay a *targeted* edit?
     oids, eids = sf.local_ids(orig), sf.local_ids(edited)
@@ -112,7 +117,7 @@ def main():
     pl = sub.add_parser("pull"); pl.add_argument("page"); pl.set_defaults(fn=cmd_pull)
     ps = sub.add_parser("push"); ps.add_argument("page")
     ps.add_argument("--dry-run", action="store_true")
-    ps.add_argument("--delete-comments", default="")
+    ps.add_argument("--allow-removed-comment-refs", default="")
     ps.add_argument("--allow-rewrite", action="store_true")
     ps.set_defaults(fn=cmd_push)
     args = p.parse_args()

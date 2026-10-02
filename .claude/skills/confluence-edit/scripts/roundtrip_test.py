@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Round-trip health check over real pages. READ-ONLY — never writes.
+"""Round-trip health check over real content. READ-ONLY — never writes.
 
   python3 roundtrip_test.py <id|url> [<id|url> ...]
 
@@ -7,10 +7,9 @@ For each page/blogpost: fetch storage and assert the pull/push transform is
 lossless (minify(pretty(storage)) == minify(storage)), element ids and comment
 refs survive pretty-printing, the storage is well-formed, and Confluence's view
 renders to non-empty comprehension markdown. Exits non-zero on any failure.
-Page ids come from argv so none are committed to the repo.
+Content IDs come from argv so none are committed to the repo.
 """
-import os, re, sys
-sys.path.insert(0, os.path.dirname(__file__))
+import re, sys
 import confluence_api as api, storage_fmt as sf, view_md
 
 ID_RE = re.compile(r'(\d{6,})')
@@ -19,7 +18,7 @@ ID_RE = re.compile(r'(\d{6,})')
 def fetch_storage(cid):
     for kind in ("pages", "blogposts"):
         try:
-            _, d = api._req("GET", api.api_url(
+            d = api._req("GET", api.api_url(
                 f"/wiki/api/v2/{kind}/{cid}?body-format=storage"))
             return kind, d["title"], d["body"]["storage"]["value"]
         except RuntimeError as e:
@@ -58,7 +57,7 @@ def main():
     if not refs:
         sys.exit("usage: roundtrip_test.py <id|url> [<id|url> ...]")
     results = [check(r) for r in refs]
-    print(f"\n{sum(results)}/{len(results)} pages passed")
+    print(f"\n{sum(results)}/{len(results)} content entries passed")
     sys.exit(0 if all(results) else 1)
 
 

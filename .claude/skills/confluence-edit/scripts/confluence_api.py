@@ -45,11 +45,6 @@ def api_url(path):
     return f"https://{domain()}{path}"
 
 
-def auth_kind():
-    _auth_config()
-    return "api-token"
-
-
 def extract_page_id(s):
     s = s.strip()
     if s.isdigit():
@@ -70,13 +65,13 @@ def _req(method, url, body=None):
         r.add_header("Content-Type", "application/json")
     try:
         with urllib.request.urlopen(r) as resp:
-            return resp.status, json.loads(resp.read().decode())
+            return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"HTTP {e.code}: {e.read().decode()[:400]}") from None
 
 
 def get_page(page_id):
-    s, d = _req("GET", api_url(
+    d = _req("GET", api_url(
         f"/wiki/api/v2/pages/{page_id}?body-format=storage"))
     return {
         "id": d["id"], "title": d["title"], "status": d.get("status", "current"),
@@ -86,13 +81,13 @@ def get_page(page_id):
 
 def get_view_html(page_id):
     """Confluence's own rendered HTML (for lossy comprehension markdown)."""
-    s, d = _req("GET", api_url(
+    d = _req("GET", api_url(
         f"/wiki/rest/api/content/{page_id}?expand=body.view"))
     return {"title": d.get("title", ""), "html": d["body"]["view"]["value"]}
 
 
 def current_version(page_id):
-    s, d = _req("GET", api_url(f"/wiki/api/v2/pages/{page_id}"))
+    d = _req("GET", api_url(f"/wiki/api/v2/pages/{page_id}"))
     return d["version"]["number"]
 
 
@@ -102,5 +97,5 @@ def put_page(page_id, storage, version, title, status, message):
         "body": {"representation": "storage", "value": storage},
         "version": {"number": version + 1, "message": message},
     }
-    s, d = _req("PUT", api_url(f"/wiki/api/v2/pages/{page_id}"), body)
+    d = _req("PUT", api_url(f"/wiki/api/v2/pages/{page_id}"), body)
     return d["version"]["number"]

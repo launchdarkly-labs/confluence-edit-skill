@@ -96,7 +96,7 @@ def _block(n, out, depth=0):
     else:
         # transparent container: recurse into children
         for k in n.kids:
-            if k.tag in BLOCK or k.tag in ("table", "hr"):
+            if k.tag in BLOCK or k.tag == "hr":
                 _block(k, out, depth)
             elif k.tag == "#text" and (k.text or "").strip():
                 out.append(k.text.strip())

@@ -9,26 +9,27 @@ You read a page as markdown to understand it, then edit the page's **real
 Confluence storage format** directly. Editing the real format (not a markdown
 translation) is what keeps inline comments, macros, tables, and layouts intact.
 
-Run commands from the `confluence-edit-skill` repository root (or use the full
-path to `cli.py`). Configure Confluence credentials as described in the
-repository README. Python 3, no deps.
+The CLI is bundled in this skill's `scripts` directory. Resolve `SKILL_DIR` to
+the directory containing this `SKILL.md`, and configure Confluence credentials
+as described in the repository README. Python 3, no dependencies.
 
 ## Workflow
 
 ```bash
-cd <path-to-confluence-edit-skill>
+SKILL_DIR="/path/to/directory-containing-this-SKILL.md"
 
 # 1. UNDERSTAND — read the page as markdown (lossy; comprehension only, do NOT edit this)
-python3 cli.py read <PAGE_ID_OR_URL>
+python3 "$SKILL_DIR/scripts/cli.py" read <PAGE_ID_OR_URL>
 
 # 2. GET AN EDITABLE COPY — fetch the storage XHTML to a local file
-python3 cli.py pull <PAGE_ID_OR_URL>      # writes .confluence/<id>.xml (pretty-printed)
+python3 "$SKILL_DIR/scripts/cli.py" pull <PAGE_ID_OR_URL>
+# writes ~/.confluence-edit/<id>.xml (pretty-printed)
 
-# 3. EDIT .confluence/<id>.xml with the Edit tool — TARGETED edits only (see rules)
+# 3. EDIT ~/.confluence-edit/<id>.xml with the Edit tool — TARGETED edits only
 
 # 4. SAVE
-python3 cli.py push <PAGE_ID_OR_URL> --dry-run   # runs the guards, no write
-python3 cli.py push <PAGE_ID_OR_URL>
+python3 "$SKILL_DIR/scripts/cli.py" push <PAGE_ID_OR_URL> --dry-run
+python3 "$SKILL_DIR/scripts/cli.py" push <PAGE_ID_OR_URL>
 ```
 
 ## Editing the storage file — rules
@@ -62,16 +63,12 @@ whole file.
 
 - **Not well-formed** → fix the XHTML you edited.
 - **Inline comment orphaned** (an `ac:ref` disappeared) → restore its marker tag,
-  or if removal is intended, `--delete-comments <ref1>,<ref2>`.
+  or if removal is intended,
+  `--allow-removed-comment-refs <ref1>,<ref2>`.
 - **"Looks like a regeneration"** (most original element ids gone) → you rewrote
   too much; make narrower edits. Only if a full rewrite is truly intended,
   `--allow-rewrite`.
 - **Page changed upstream** → re-`pull` and redo your edit (not bypassable).
 
-Prefer fixing over bypassing. Only use `--delete-comments` / `--allow-rewrite`
-when the user clearly wants that.
-
-## Out of scope (for now)
-
-Creating pages and searching are not supported — you must be given the page ID
-or URL.
+Prefer fixing over bypassing. Only use `--allow-removed-comment-refs` /
+`--allow-rewrite` when the user clearly wants that.

@@ -48,14 +48,29 @@ end-to-end.
 
 ## Installation
 
-Requires Python 3 (no dependencies).
+The skill runtime requires Python 3 and no third-party packages.
+
+Install it globally for Cursor and Claude Code with the
+[Agent Skills CLI](https://github.com/vercel-labs/skills):
 
 ```bash
-git clone git@github.com:launchdarkly-labs/confluence-edit-skill.git
-cd confluence-edit-skill
-# Make the confluence-edit skill available to Claude in every project:
-ln -s "$PWD/.claude/skills/confluence-edit" ~/.claude/skills/confluence-edit
+npx skills add launchdarkly-labs/confluence-edit-skill \
+  --skill confluence-edit --global \
+  --agent cursor --agent claude-code
 ```
+
+Alternatively, clone the repository and copy the self-contained skill folder
+to either agent's global skill directory:
+
+```bash
+git clone --depth 1 https://github.com/launchdarkly-labs/confluence-edit-skill.git
+mkdir -p ~/.cursor/skills ~/.claude/skills
+cp -R confluence-edit-skill/.claude/skills/confluence-edit ~/.cursor/skills/
+cp -R confluence-edit-skill/.claude/skills/confluence-edit ~/.claude/skills/
+```
+
+You can also ask Cursor or Claude to install `confluence-edit` globally from
+this repository URL.
 
 Authenticate with an Atlassian API token (id.atlassian.com → Security → API tokens):
 
@@ -64,6 +79,9 @@ export CONFLUENCE_URL="https://your-company.atlassian.net"
 export CONFLUENCE_USERNAME="you@company.com"
 export CONFLUENCE_API_TOKEN="…"
 ```
+
+The account needs permission to view the page and its space. Pushing also
+requires permission to update pages in the space.
 
 **This is not a full Confluence integration.** The `confluence-edit` skill only
 *reads and edits existing pages*. For searching, creating pages, comments, or
@@ -74,8 +92,8 @@ labels, keep using the Atlassian MCP.
 - **`read <page-id-or-url>`** — print the page as Markdown to read and plan an
   edit. Don't edit this output.
 - **`pull <page-id-or-url>`** — download the page's storage to
-  `.confluence/<id>.xml`. Edit *that file*, keeping element tags, `local-id`s,
-  and inline-comment markers intact.
+  `~/.confluence-edit/<id>.xml`. Edit *that file*, keeping element tags,
+  `local-id`s, and inline-comment markers intact.
 - **`push <page-id-or-url>`** — validate the edited file and save it back as a new
   version. `--dry-run` runs the guards without writing.
 
@@ -85,8 +103,8 @@ labels, keep using the Atlassian MCP.
 offers an explicit override when you truly mean it:
 
 - **Orphaned comments.** If an edit drops an inline comment's anchor, push stops.
-  Keep the comment's marker tag to preserve it, or pass `--delete-comments <ref>`
-  to confirm you meant to delete that commented text.
+  Keep the comment's marker tag to preserve it, or pass
+  `--allow-removed-comment-refs <ref>` to acknowledge its removal.
 - **Clobbering.** If an edit regenerates most of the page instead of changing a
   targeted span — measured by how many of the page's original element IDs survive
   — push stops. This is the failure mode where an agent hand-writes a whole "new
