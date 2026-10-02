@@ -1,13 +1,14 @@
 # confluence-edit-skill
 
-Edit Confluence pages with an AI agent, without losing comments or rich content.
+A lightweight tool to safely make small edits to large Confluence pages.
 
 This skill is battle-tested and used internally. Bugfixes welcome, but there's no specific roadmap for evolving this tool.
 
 ## The problem
 
-Most of the time when an agent edits a Confluence page, the page
-is converted to Markdown, edited, and written back whole. That:
+Atlassian's official MCP loads the entire page's content into an agent's context when making an edit. This can be expensive when making a small edit to a large pages.
+
+Other Confluence skills solve this by converting the page's content to Markdown, reducing the size significantly. However, this is a lossy conversion:
 
 - **flattens rich content** — status chips, panels, expands, dates, @mentions,
   and layouts turn into plain text, or vanish;
@@ -16,37 +17,36 @@ is converted to Markdown, edited, and written back whole. That:
 - **rewrites the whole page** — the version diff shows everything as changed, so
   no one can tell what the edit actually did.
 
-Some skills let you opt into the **storage format** (Confluence's native XHTML)
-instead, which fixes all of that — but storage is far bulkier than Markdown, and
-tools like the Atlassian MCP read the entire body into the agent's context, which
-is more expensive (a real page is easily tens of thousands of tokens).
-
-The same status row, both ways:
-
-```
-Markdown:  **Status:** In Progress
-```
-```html
-Storage:   <p><strong>Status:</strong> <ac:structured-macro ac:name="status">
-             <ac:parameter ac:name="colour">Yellow</ac:parameter>
-             <ac:parameter ac:name="title">In Progress</ac:parameter>
-           </ac:structured-macro></p>
-```
-
-Markdown is compact but loses the chip; storage keeps it but is many times larger.
-
 ## The approach
 
-`confluence-edit-skill` makes the storage format the only way to edit, so an agent can't
-accidentally mess up unrelated parts of the doc, but avoids the context blow-up with a **pull / push** workflow:
+`confluence-edit-skill` avoids the context blow-up with a **pull / push** workflow:
 
 - `pull` writes the page's storage to a file on disk. The agent finds and edits
   just the relevant spans (grep + small reads), so it never loads the whole page
   into context.
-- `push` saves that file back, blocking unsafe changes (see Safety).
+- `push` saves that file back, blocking changes that unintentionally rewrite content.
 
 And `read` renders a page as Markdown when an agent just wants to read it
 end-to-end.
+
+### Safety
+
+`push` refuses any change that is probably too destructive, explains why, and
+offers an explicit override when you truly mean it:
+
+- **Orphaned comments.** If an edit drops an inline comment's anchor, push stops.
+  Keep the comment's marker tag to preserve it, or pass
+  `--allow-removed-comment-refs <ref>` to acknowledge its removal.
+- **Full rewrites.** If an edit regenerates most of the page instead of changing a
+  targeted span — measured by how many of the page's original element IDs survive
+  — push stops. This is the failure mode where an agent hand-writes a whole "new
+  version" and silently detaches every comment and macro. Pass `--allow-rewrite`
+  only for a deliberate full rewrite.
+- **Concurrent edits (version races).** `push` writes the change as version *N+1*
+  of the version you pulled. It pre-checks the live version and stops if the page
+  moved since your pull; and as a backstop, Confluence itself rejects any write
+  whose version number isn't exactly the next one (HTTP 409). So a concurrent
+  edit can never be silently clobbered — re-pull and reapply.
 
 ## Installation
 
@@ -98,24 +98,3 @@ labels, keep using the Atlassian MCP.
   `local-id`s, and inline-comment markers intact.
 - **`push <page-id-or-url>`** — validate the edited file and save it back as a new
   version. `--dry-run` runs the guards without writing.
-
-## Safety
-
-`push` refuses any change Confluence couldn't track cleanly, explains why, and
-offers an explicit override when you truly mean it:
-
-- **Orphaned comments.** If an edit drops an inline comment's anchor, push stops.
-  Keep the comment's marker tag to preserve it, or pass
-  `--allow-removed-comment-refs <ref>` to acknowledge its removal.
-- **Clobbering.** If an edit regenerates most of the page instead of changing a
-  targeted span — measured by how many of the page's original element IDs survive
-  — push stops. This is the failure mode where an agent hand-writes a whole "new
-  version" and silently detaches every comment and macro. Pass `--allow-rewrite`
-  only for a deliberate full rewrite.
-- **Concurrent edits (version races).** `push` writes the change as version *N+1*
-  of the version you pulled. It pre-checks the live version and stops if the page
-  moved since your pull; and as a backstop, Confluence itself rejects any write
-  whose version number isn't exactly the next one (HTTP 409). So a concurrent
-  edit can never be silently clobbered — re-pull and reapply.
-- **Malformed storage.** Push checks that the edited XHTML is well-formed before
-  sending it.
