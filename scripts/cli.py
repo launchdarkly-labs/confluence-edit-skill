@@ -3,7 +3,7 @@
 
   read <id|url>                 print the page as markdown (lossy, comprehension only)
   pull <id|url>                 fetch storage -> ~/.confluence-edit/<id>.xml + sidecar
-  push <id|url> [--dry-run]     minify edited storage -> version-locked PUT, with guards
+  push <id|url> [--dry-run]     convert edited storage -> version-locked PUT, with guards
        [--allow-removed-comment-refs r1,r2]   acknowledge removed comment references
        [--allow-rewrite]           acknowledge a non-targeted edit (most elements regenerated)
 
@@ -33,20 +33,20 @@ def cmd_read(args):
 def cmd_pull(args):
     pid = api.extract_page_id(args.page)
     page = api.get_page(pid)
-    pretty = sf.pretty(page["storage"])
+    editable = sf.to_editable(page["storage"])
     os.makedirs(DIR, exist_ok=True)
     xmlp, scp = _paths(pid)
-    open(xmlp, "w").write(pretty)
+    open(xmlp, "w").write(editable)
     json.dump({
         "page_id": pid, "title": page["title"], "status": page["status"],
         "version": page["version"],
-        "orig_storage": sf.minify(page["storage"]),
+        "orig_storage": page["storage"],
         "fetched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }, open(scp, "w"), indent=1)
     nids = len(sf.local_ids(page["storage"]))
     nrefs = len(sf.comment_refs(page["storage"]))
     print(f"pulled '{page['title']}' v{page['version']} -> {xmlp}")
-    print(f"  {len(pretty.splitlines())} lines, {nids} element ids, {nrefs} inline comment(s)")
+    print(f"  {len(editable.splitlines())} lines, {nids} element ids, {nrefs} inline comment(s)")
     print("  edit the .xml with targeted edits (keep element tags & local-id/ac:ref intact), then push")
 
 
@@ -56,8 +56,12 @@ def cmd_push(args):
     if not os.path.exists(scp):
         sys.exit(f"no local pull for {pid} (run: pull first)")
     sc = json.load(open(scp))
-    edited = sf.minify(open(xmlp).read())
     orig = sc["orig_storage"]
+    editable = open(xmlp).read()
+    if editable == sf.to_editable(orig):
+        print("no change — nothing to push.")
+        return
+    edited = sf.to_storage(editable)
 
     problems = []
 
@@ -94,7 +98,7 @@ def cmd_push(args):
         sys.exit(2)
 
     print(f"guards OK | element ids preserved {preserved}/{len(oids)} | "
-          f"comments {len(sf.comment_refs(edited))} | {'changed' if edited != orig else 'no change'}")
+          f"comments {len(sf.comment_refs(edited))} | changed")
     if args.dry_run:
         print("dry-run — would push.")
         return

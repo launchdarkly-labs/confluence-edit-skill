@@ -1,11 +1,8 @@
-"""Storage-format helpers: pretty-print (for editing), minify (for push), and
-identity extraction for the push guards.
+"""Storage-format helpers for editable layout and push validation.
 
-Pretty-print only reflows whitespace *between* tags so the agent can navigate
-the file by line. CDATA / code / preformatted regions are protected (their
-whitespace is significant). minify() is the inverse, so a pulled-then-pushed
-unedited page round-trips byte-identically (real Confluence storage is already
-">"-adjacent / single-line).
+The editable representation adds line breaks only between directly adjacent
+tags. Existing whitespace is left untouched. CDATA, code, and preformatted
+regions are protected because their contents may include tag-like text.
 """
 import re
 
@@ -23,17 +20,17 @@ def _restore(s, chunks):
     return re.sub(r"\x00(\d+)\x00", lambda m: chunks[int(m.group(1))], s)
 
 
-def pretty(storage):
-    """One element boundary per line, leaving text/CDATA untouched."""
+def to_editable(storage):
+    """Add navigational line breaks without changing existing whitespace."""
     s, chunks = _protect(storage)
-    s = re.sub(r'>\s*<', '>\n<', s)
+    s = s.replace('><', '>\n<')
     return _restore(s, chunks)
 
 
-def minify(storage):
-    """Inverse of pretty(): collapse whitespace that sits purely between tags."""
-    s, chunks = _protect(storage)
-    s = re.sub(r'>\s+<', '><', s)
+def to_storage(editable):
+    """Collapse bare tag-boundary line breaks before sending storage."""
+    s, chunks = _protect(editable)
+    s = s.replace('>\n<', '><')
     return _restore(s, chunks)
 
 

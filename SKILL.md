@@ -39,7 +39,7 @@ python3 "$SKILL_DIR/scripts/cli.py" read <PAGE_ID_OR_URL>
 
 # 2. GET AN EDITABLE COPY — fetch the storage XHTML to a local file
 python3 "$SKILL_DIR/scripts/cli.py" pull <PAGE_ID_OR_URL>
-# writes ~/.confluence-edit/<id>.xml (pretty-printed)
+# writes ~/.confluence-edit/<id>.xml (line-broken for navigation)
 
 # 3. EDIT ~/.confluence-edit/<id>.xml with the Edit tool — TARGETED edits only
 
@@ -50,10 +50,10 @@ python3 "$SKILL_DIR/scripts/cli.py" push <PAGE_ID_OR_URL>
 
 ## Editing the storage file — rules
 
-The `.xml` is Confluence storage format (XHTML), pretty-printed one element per
-line so you can navigate it. **Find the spot with `Grep`, read a small window
-with `Read offset/limit`, and make a narrow `Edit`.** Do not read or rewrite the
-whole file.
+The `.xml` is Confluence storage format (XHTML), with line breaks added at
+adjacent tag boundaries so you can navigate it. Existing whitespace remains
+unchanged. **Find the spot with `Grep`, read a small window with `Read
+offset/limit`, and make a narrow `Edit`.** Do not read or rewrite the whole file.
 
 1. **Targeted edits only.** Change the text/attributes you mean to change and
    leave everything else byte-for-byte. Never select-all-and-replace or
