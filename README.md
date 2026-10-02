@@ -6,7 +6,7 @@ This skill is battle-tested and used internally. Bugfixes welcome, but there's n
 
 ## The problem
 
-Atlassian's official MCP loads the entire page's content into an agent's context when making an edit. This can be expensive when making a small edit to a large pages.
+Atlassian's official MCP loads the entire page's content into an agent's context when making an edit. This can be expensive when working with a large page.
 
 Other Confluence skills solve this by converting the page's content to Markdown, reducing the size significantly. However, this is a lossy conversion:
 
